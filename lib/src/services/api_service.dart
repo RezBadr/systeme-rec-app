@@ -45,6 +45,37 @@ class ApiService {
     return _decodeResponse(response);
   }
 
+  static Future<dynamic> patch(
+    String path, {
+    required Map<String, dynamic> body,
+    String? token,
+  }) async {
+    final uri = _uri(path);
+    final response = await http.patch(uri,
+        headers: _defaultHeaders(token: token), body: jsonEncode(body));
+    return _decodeResponse(response);
+  }
+
+  static Future<dynamic> put(
+    String path, {
+    required Map<String, dynamic> body,
+    String? token,
+  }) async {
+    final uri = _uri(path);
+    final response = await http.put(uri,
+        headers: _defaultHeaders(token: token), body: jsonEncode(body));
+    return _decodeResponse(response);
+  }
+
+  static Future<dynamic> delete(
+    String path, {
+    String? token,
+  }) async {
+    final uri = _uri(path);
+    final response = await http.delete(uri, headers: _defaultHeaders(token: token));
+    return _decodeResponse(response);
+  }
+
   static dynamic _decodeResponse(http.Response response) {
     final body = response.body.trim();
     if (body.isEmpty) {
@@ -57,12 +88,27 @@ class ApiService {
       );
     }
 
-    final parsed = jsonDecode(body);
-    if (parsed is! Map<String, dynamic>) {
+    Map<String, dynamic>? parsed;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        parsed = decoded;
+      }
+    } catch (_) {
+      // Some upstream middleware can return plain text errors.
+    }
+
+    if (parsed == null) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        throw ApiException(
+          message: 'Invalid response format',
+          statusCode: response.statusCode,
+          body: body,
+        );
+      }
       throw ApiException(
-        message: 'Invalid response format',
+        message: body.isEmpty ? 'Erreur serveur' : body,
         statusCode: response.statusCode,
-        body: body,
       );
     }
 
@@ -97,5 +143,5 @@ class ApiException implements Exception {
   final String? body;
 
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => message;
 }

@@ -7,6 +7,10 @@ import 'screens/register_screen.dart';
 import 'screens/preferences_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/loading_screen.dart';
+import 'screens/user_search_screen.dart';
+import 'screens/user_public_profile_screen.dart';
+import 'screens/friend_requests_screen.dart';
+import 'screens/anime_search_screen.dart';
 
 /// Root widget for the Anime Recommendation app.
 class AnimeRecommendationApp extends StatefulWidget {
@@ -76,12 +80,25 @@ class _AnimeRecommendationAppState extends State<AnimeRecommendationApp> {
         },
       ),
       routes: {
-        LoginScreen.routeName: (context) => const LoginScreen(),
-        RegisterScreen.routeName: (context) => const RegisterScreen(),
-        PreferencesScreen.routeName: (context) => const PreferencesScreen(),
-        HomeScreen.routeName: (context) => const HomeScreen(),
-        ProfileScreen.routeName: (context) => const ProfileScreen(),
-      },
+          LoginScreen.routeName: (context) => const LoginScreen(),
+          RegisterScreen.routeName: (context) => const RegisterScreen(),
+          PreferencesScreen.routeName: (context) => const PreferencesScreen(),
+          HomeScreen.routeName: (context) => const HomeScreen(),
+          ProfileScreen.routeName: (context) => const ProfileScreen(),
+          UserSearchScreen.routeName: (context) => const UserSearchScreen(),
+          FriendRequestsScreen.routeName: (context) => const FriendRequestsScreen(),
+          AnimeSearchScreen.routeName: (context) => const AnimeSearchScreen(),
+        },
+        onGenerateRoute: (settings) {
+          if (settings.name == '/user-profile') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            final userId = args?['userId'] as int?;
+            if (userId != null) {
+              return MaterialPageRoute(builder: (_) => UserPublicProfileScreen(userId: userId));
+            }
+          }
+          return null;
+        },
     );
   }
 }

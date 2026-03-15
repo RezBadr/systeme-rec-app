@@ -5,6 +5,7 @@ import '../services/anime_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/anime_card.dart';
 import 'anime_detail_screen.dart';
+import 'anime_search_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -72,6 +73,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         title: const Text('Anime Recommandation'),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).pushNamed(AnimeSearchScreen.routeName);
+            },
+            icon: const Icon(Icons.search),
+            tooltip: 'Rechercher des animes',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).pushNamed('/friend-requests');
+            },
+            icon: const Icon(Icons.group),
+            tooltip: 'Demandes d\'amis',
+          ),
           IconButton(
             onPressed: () {
               Navigator.of(context).pushNamed('/profile');

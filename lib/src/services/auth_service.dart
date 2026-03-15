@@ -28,6 +28,29 @@ class AuthService {
   String? get token => _token;
   int? get userId => _userId;
 
+  bool _hasSavedPreferences(dynamic payload) {
+    if (payload is! Map<String, dynamic>) {
+      return false;
+    }
+
+    final preferredGenres = payload['preferredGenres'];
+    if (preferredGenres is List && preferredGenres.isNotEmpty) {
+      return true;
+    }
+
+    final genreIds = payload['genreIds'];
+    if (genreIds is List && genreIds.isNotEmpty) {
+      return true;
+    }
+
+    final genres = payload['genres'];
+    if (genres is List && genres.isNotEmpty) {
+      return true;
+    }
+
+    return false;
+  }
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_kTokenKey);
@@ -38,8 +61,7 @@ class AuthService {
       // Check with backend if preferences exist
       try {
         final data = await ApiService.get('/users/$_userId/preferences', token: _token);
-        final preferredGenres = (data as Map<String, dynamic>)['preferredGenres'] as List<dynamic>?;
-        _preferencesComplete = preferredGenres != null && preferredGenres.isNotEmpty;
+        _preferencesComplete = _hasSavedPreferences(data);
       } catch (_) {
         _preferencesComplete = false;
       }
@@ -86,8 +108,7 @@ class AuthService {
     // Vérifier préférences existantes
     try {
       final prefData = await ApiService.get('/users/$userId/preferences', token: token);
-      final genres = (prefData as Map<String, dynamic>)['preferredGenres'] as List<dynamic>?;
-      final complete = genres != null && genres.isNotEmpty;
+      final complete = _hasSavedPreferences(prefData);
       await _savePreferencesComplete(complete);
     } catch (_) {
       await _savePreferencesComplete(false);
@@ -96,9 +117,11 @@ class AuthService {
 
   Future<void> logout() async {
     _token = null;
+    _userId = null;
     _preferencesComplete = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kTokenKey);
+    await prefs.remove(_kUserIdKey);
     await prefs.remove(_kPreferencesCompleteKey);
     isLoggedInNotifier.value = false;
     preferencesCompleteNotifier.value = false;

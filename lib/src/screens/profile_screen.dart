@@ -4,6 +4,9 @@ import '../models/anime.dart';
 import '../models/user.dart';
 import '../services/anime_service.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
+import '../services/gamification_service.dart';
+import 'friend_requests_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,7 +21,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late Future<User?> _profileFuture;
   late Future<int> _seenCountFuture;
   late Future<int> _watchLaterCountFuture;
+  late Future<int> _pendingRequestsFuture;
+  late Future<int> _commentCountFuture;
   late Future<List<Anime>> _watchLaterListFuture;
+
+  final TextEditingController _avatarUrlController = TextEditingController();
+  final TextEditingController _coverUrlController = TextEditingController();
+  bool _isUpdatingImages = false;
+
 
   @override
   void initState() {
@@ -26,6 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _profileFuture = AnimeService.instance.fetchUserProfile();
     _seenCountFuture = AnimeService.instance.fetchSeenCount();
     _watchLaterCountFuture = AnimeService.instance.fetchWatchLaterCount();
+    _pendingRequestsFuture = UserService.instance.fetchPendingFriendRequestCount();
+    _commentCountFuture = GamificationService.instance.getCommentCount();
     _watchLaterListFuture = AnimeService.instance.fetchWatchLaterAnimes();
   }
 
@@ -34,8 +46,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _profileFuture = AnimeService.instance.fetchUserProfile();
       _seenCountFuture = AnimeService.instance.fetchSeenCount();
       _watchLaterCountFuture = AnimeService.instance.fetchWatchLaterCount();
+      _pendingRequestsFuture = UserService.instance.fetchPendingFriendRequestCount();
+      _commentCountFuture = GamificationService.instance.getCommentCount();
       _watchLaterListFuture = AnimeService.instance.fetchWatchLaterAnimes();
     });
+  }
+
+  Future<void> _updateProfileImages() async {
+    if (!_avatarUrlController.text.trim().isNotEmpty && !_coverUrlController.text.trim().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez saisir au moins un URL.')));
+      return;
+    }
+
+    setState(() => _isUpdatingImages = true);
+    try {
+      await UserService.instance.updateProfileImages(
+        avatarUrl: _avatarUrlController.text.trim().isNotEmpty ? _avatarUrlController.text.trim() : null,
+        coverUrl: _coverUrlController.text.trim().isNotEmpty ? _coverUrlController.text.trim() : null,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Images de profil mises à jour.')));
+      _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur mise à jour images : $e')));
+    } finally {
+      if (mounted) setState(() => _isUpdatingImages = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _avatarUrlController.dispose();
+    _coverUrlController.dispose();
+    super.dispose();
   }
 
   @override
@@ -71,10 +115,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=${user.id}'),
-                          backgroundColor: Colors.grey[200],
+                        ClipOval(
+                          child: Image.network(
+                            user.avatarUrl ?? 'https://i.pravatar.cc/150?u=${user.id}',
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 72,
+                              height: 72,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.person, size: 36),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -116,6 +169,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   trailing: Text(count.toString()),
                 );
               },
+            ),
+            FutureBuilder<int>(
+              future: _pendingRequestsFuture,
+              builder: (context, snapshot) {
+                final pending = (snapshot.data ?? 0);
+                return ListTile(
+                  leading: const Icon(Icons.person_add),
+                  title: const Text('Invitations en attente'),
+                  trailing: Text(pending.toString()),
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendRequestsScreen()));
+                  },
+                );
+              },
+            ),
+            FutureBuilder<int>(
+              future: _commentCountFuture,
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                return ListTile(
+                  leading: const Icon(Icons.handshake),
+                  title: const Text('Commentaires postés'),
+                  trailing: Text(count.toString()),
+                );
+              },
+            ),
+            FutureBuilder<int>(
+              future: _commentCountFuture,
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                final badge = GamificationService.instance.badgeFromCount(count);
+                return ListTile(
+                  leading: const Icon(Icons.emoji_events),
+                  title: const Text('Badge gamification'),
+                  trailing: Text(badge),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Card(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Mettre à jour avatar / couverture', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _avatarUrlController,
+                      decoration: const InputDecoration(hintText: 'URL de l\'avatar'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _coverUrlController,
+                      decoration: const InputDecoration(hintText: 'URL de la couverture'),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _isUpdatingImages ? null : _updateProfileImages,
+                      child: _isUpdatingImages
+                          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Mettre à jour les images'),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             const Text('Liste à voir', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

@@ -3,7 +3,10 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 
 import '../models/anime.dart';
 import '../models/comment.dart';
+import '../models/genre.dart';
+import '../screens/user_public_profile_screen.dart';
 import '../services/anime_service.dart';
+import '../services/gamification_service.dart';
 
 class AnimeDetailScreen extends StatefulWidget {
   const AnimeDetailScreen({super.key, required this.animeId});
@@ -17,6 +20,7 @@ class AnimeDetailScreen extends StatefulWidget {
 class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   late Future<Anime> _animeFuture;
   late Future<List<Comment>> _commentsFuture;
+  late Future<List<Genre>> _genresFuture;
   final TextEditingController _commentController = TextEditingController();
   bool _isPostingComment = false;
 
@@ -29,6 +33,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   void _loadData() {
     _animeFuture = AnimeService.instance.fetchAnimeDetail(widget.animeId);
     _commentsFuture = AnimeService.instance.fetchComments(widget.animeId);
+    _genresFuture = AnimeService.instance.fetchGenres();
   }
 
   Future<void> _postComment() async {
@@ -39,11 +44,23 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     setState(() => _isPostingComment = true);
     try {
       await AnimeService.instance.postComment(widget.animeId, content);
+      await GamificationService.instance.incrementCommentCount();
+      final commentCount = await GamificationService.instance.getCommentCount();
+      final badgeMessage = () {
+        if (commentCount == 4) return 'Bravo ! Vous avez débloqué un badge Commentateur engagé.';
+        if (commentCount == 10) return 'Félicitations ! Badge Maître du commentaire débloqué.';
+        return null;
+      }();
+
       _commentController.clear();
       if (!mounted) return;
       setState(() {
         _commentsFuture = AnimeService.instance.fetchComments(widget.animeId);
       });
+
+      if (badgeMessage != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(badgeMessage)));
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,9 +123,16 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           ),
           const SizedBox(height: 8),
           if (anime.genreIds != null && anime.genreIds!.isNotEmpty)
-            Text(
-              anime.genreIds!.map((id) => 'Genre $id').join(' • '),
-              style: Theme.of(context).textTheme.bodyMedium,
+            FutureBuilder<List<Genre>>(
+              future: _genresFuture,
+              builder: (context, genresSnapshot) {
+                final genres = genresSnapshot.data ?? [];
+                final mapGenre = {for (var g in genres) g.id: g.name};
+                final genreText = anime.genreIds!
+                    .map((id) => mapGenre[id] ?? 'Genre $id')
+                    .join(' • ');
+                return Text(genreText, style: Theme.of(context).textTheme.bodyMedium);
+              },
             ),
           const SizedBox(height: 12),
           if (anime.synopsis != null && anime.synopsis!.isNotEmpty)
@@ -222,6 +246,13 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                     _formatDate(comment.createdAt),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+                  onTap: comment.userId != null
+                      ? () {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => UserPublicProfileScreen(userId: comment.userId!),
+                          ));
+                        }
+                      : null,
                 ),
               ),
             if (comments.isEmpty)
