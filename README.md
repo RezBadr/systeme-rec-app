@@ -1,5 +1,7 @@
 # anime_recommendation_app
 
+Projet : BADR REZOUKI, MAHMUTOVIC Elma, PELLARD Téa, JUANOLA Lily-Fleur
+
 Frontend Flutter application for an anime recommendation service.
 
 ## Features
